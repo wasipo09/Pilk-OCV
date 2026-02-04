@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.pyo
+temp_*/
+temp_ocv_exports/
