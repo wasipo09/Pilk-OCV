@@ -44,7 +44,56 @@ mpl.rcParams['axes.spines.top'] = False
 mpl.rcParams['axes.spines.right'] = False
 
 from btc_options_viewer import deribit_get_index_price, deribit_get_options_chain
-from lotto_scanner import calculate_gex, find_gex_zones
+
+# GEX calculation functions (from Pilk-Option-Chain)
+def calculate_gex(df, btc_price):
+    """Calculate GEX for Deribit data (has OI)."""
+    if df is None or df.empty:
+        return df
+    
+    # Ensure columns exist
+    for col in ['call_gamma', 'put_gamma', 'call_oi', 'put_oi']:
+        if col not in df.columns:
+            df[col] = 0.0
+    
+    df.fillna(0, inplace=True)
+    
+    spot_1pct = btc_price * 0.01
+    df['call_gex'] = df['call_gamma'] * df['call_oi'] * btc_price * spot_1pct
+    df['put_gex'] = df['put_gamma'] * df['put_oi'] * btc_price * spot_1pct
+    df['total_gex'] = df['call_gex'] + df['put_gex']
+    df['net_gex'] = df['call_gex'] - df['put_gex']  # Positive = call heavy
+    df['dist_pct'] = (df['strike'] - btc_price) / btc_price * 100
+    
+    return df
+
+
+def find_gex_zones(deribit_df, btc_price, top_n=5):
+    """Identify key GEX zones from Deribit."""
+    if deribit_df is None or deribit_df.empty:
+        return [], []
+    
+    # Aggregate GEX by strike (across expirations)
+    gex_by_strike = deribit_df.groupby('strike').agg({
+        'call_gex': 'sum',
+        'put_gex': 'sum',
+        'total_gex': 'sum',
+        'net_gex': 'sum'
+    }).reset_index()
+    
+    gex_by_strike['dist_pct'] = (gex_by_strike['strike'] - btc_price) / btc_price * 100
+    
+    # Filter to relevant range (+/- 15% from spot)
+    gex_by_strike = gex_by_strike[abs(gex_by_strike['dist_pct']) <= 15]
+    
+    # Top Call GEX (gamma squeeze up)
+    top_call_gex = gex_by_strike.nlargest(top_n, 'call_gex')
+    
+    # Top Put GEX (gamma squeeze down)
+    top_put_gex = gex_by_strike.nlargest(top_n, 'put_gex')
+    
+    return top_call_gex, top_put_gex
+
 
 def fetch_live_spot_price() -> float:
     """Get current BTC spot price using CCXT (Binance exchange)."""
