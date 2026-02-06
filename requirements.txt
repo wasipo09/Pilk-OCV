@@ -6,3 +6,4 @@ numpy>=1.24.0
 rich>=13.5.2
 typer>=0.9.0
 matplotlib>=3.8.0
+seaborn>=0.12.0

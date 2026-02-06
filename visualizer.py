@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Pilk Options Chain Visualizer
+"""Pilk Options Chain Visualizer - Improved Styling
 
 Provides CLI tooling for building heat maps of Deribit open interest, overlaying GEX zones,
-and plotting IV smiles for BTC options. Requires Typer for CLI, Matplotlib for plotting,
-and Rich for terminal summaries.
+and plotting IV smiles for BTC options. Enhanced with professional styling.
 """
 
 from __future__ import annotations
@@ -15,14 +14,33 @@ from pathlib import Path
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import typer
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.lines import Line2D
 from rich.console import Console
 from rich.table import Table
+
+# Set professional styling
+sns.set_style("darkgrid")
+mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'Liberation Sans', 'sans-serif']
+mpl.rcParams['font.size'] = 10
+mpl.rcParams['axes.labelsize'] = 11
+mpl.rcParams['axes.titlesize'] = 13
+mpl.rcParams['xtick.labelsize'] = 9
+mpl.rcParams['ytick.labelsize'] = 9
+mpl.rcParams['legend.fontsize'] = 9
+mpl.rcParams['figure.titlesize'] = 14
+mpl.rcParams['grid.alpha'] = 0.15
+mpl.rcParams['grid.linewidth'] = 0.5
+mpl.rcParams['axes.linewidth'] = 0.8
+mpl.rcParams['axes.spines.top'] = False
+mpl.rcParams['axes.spines.right'] = False
 
 from btc_options_viewer import deribit_get_index_price, deribit_get_options_chain
 from lotto_scanner import calculate_gex, find_gex_zones
@@ -104,7 +122,7 @@ def _display_gex_table(call_zones: pd.DataFrame, put_zones: pd.DataFrame) -> Non
 
 
 def _save_figure(fig: plt.Figure, path: Path) -> Path:
-    fig.savefig(path, dpi=200, bbox_inches="tight")
+    fig.savefig(path, dpi=200, bbox_inches="tight", facecolor='white', edgecolor='none')
     console.print(f"[green]Saved:[/green] {path}")
     return path
 
@@ -116,15 +134,18 @@ def build_heatmap(
     btc_price: float,
     expiry: str,
 ) -> plt.Figure:
-    """Build the open interest heat map with GEX overlays."""
+    """Build the open interest heat map with GEX overlays - improved styling."""
     strikes = df["strike"].astype(float).to_numpy()
     call_oi = df.get("call_oi", pd.Series(0, index=df.index)).fillna(0).to_numpy()
     put_oi = df.get("put_oi", pd.Series(0, index=df.index)).fillna(0).to_numpy()
 
     matrix = np.vstack([call_oi, put_oi])
-    fig, ax = plt.subplots(figsize=(14, 6))
 
-    heatmap_kwargs = {"cmap": "inferno", "aspect": "auto", "origin": "lower"}
+    # Professional color palette - using 'YlOrRd' for warm, professional heatmap
+    fig, ax = plt.subplots(figsize=(15, 7))
+
+    heatmap_kwargs = {"cmap": "YlOrRd", "aspect": "auto", "origin": "lower"}
+
     positives = matrix[matrix > 0]
     if positives.size > 0:
         heatmap_kwargs["norm"] = LogNorm(vmin=max(positives.min(), 1e-2), vmax=positives.max())
@@ -133,20 +154,32 @@ def build_heatmap(
         cbar_label = "Open Interest"
 
     im = ax.imshow(matrix, **heatmap_kwargs)
-    cbar = fig.colorbar(im, ax=ax, pad=0.02)
-    cbar.set_label(cbar_label)
+    cbar = fig.colorbar(im, ax=ax, pad=0.015, aspect=30)
+    cbar.set_label(cbar_label, fontsize=10)
+    cbar.ax.tick_params(labelsize=9)
 
     x_positions = np.arange(len(strikes))
     step = max(1, len(strikes) // 12)
     tick_indices = x_positions[::step]
+
     ax.set_xticks(tick_indices)
-    ax.set_xticklabels([f"{int(strikes[i]):,}" for i in tick_indices], rotation=45, ha="right")
+    ax.set_xticklabels([f"{int(strikes[i]):,}" for i in tick_indices], rotation=45, ha='right')
     ax.set_yticks([0, 1])
-    ax.set_yticklabels(["Call OI", "Put OI"])
-    ax.set_title(f"Open Interest Heatmap · BTC {expiry} · Spot ${btc_price:,.0f}")
-    ax.set_xlabel("Strike")
+    ax.set_yticklabels(["Call OI", "Put OI"], fontsize=11)
+
+    # Improved title with better formatting
+    title_text = f"Open Interest Heatmap — BTC {expiry} — Spot ${btc_price:,.0f}"
+    ax.set_title(title_text, pad=15, fontweight='600', loc='left')
+    ax.set_xlabel("Strike Price", fontsize=11, fontweight='500')
     ax.set_xlim(-0.5, len(strikes) - 0.5)
     ax.set_ylim(-0.5, 1.5)
+
+    # Professional grid styling
+    ax.grid(False)  # Turn off default grid for heatmap
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_linewidth(0.8)
+        spine.set_color('#333333')
 
     strike_to_idx = {strike: idx for idx, strike in enumerate(strikes)}
 
@@ -155,76 +188,106 @@ def build_heatmap(
             idx_pos = strike_to_idx.get(row["strike"])
             if idx_pos is None:
                 continue
-            ax.axvline(idx_pos, color=color, linestyle=":", linewidth=1.6, alpha=0.8)
+            # More subtle, professional dashed lines
+            ax.axvline(idx_pos, color=color, linestyle='--', linewidth=2, alpha=0.7)
             ax.text(
                 idx_pos,
-                1.35,
-                f"{label} {int(row['strike']):,}",
+                1.42,
+                f"{label} GEX",
                 rotation=90,
                 color=color,
-                fontsize=8,
-                va="bottom",
-                ha="center",
-                alpha=0.9,
+                fontsize=9,
+                fontweight='600',
+                va='bottom',
+                ha='center',
+                alpha=0.85,
             )
 
-    draw_zones(call_zones, "Call GEX", "lawngreen")
-    draw_zones(put_zones, "Put GEX", "magenta")
+    # Professional color scheme for zones
+    draw_zones(call_zones, "Call", "#2ECC71")  # Emerald green
+    draw_zones(put_zones, "Put", "#E74C3C")  # Professional red
 
+    # Enhanced legend
     legend_entries = []
     if not call_zones.empty:
-        legend_entries.append(Line2D([0], [0], color="lawngreen", linestyle=":", label="Call GEX"))
+        legend_entries.append(Line2D([0], [0], color="#2ECC71", linestyle='--', linewidth=2, label="Call GEX Zone"))
     if not put_zones.empty:
-        legend_entries.append(Line2D([0], [0], color="magenta", linestyle=":", label="Put GEX"))
+        legend_entries.append(Line2D([0], [0], color="#E74C3C", linestyle='--', linewidth=2, label="Put GEX Zone"))
     if legend_entries:
-        ax.legend(handles=legend_entries, loc="upper left")
+        ax.legend(
+            handles=legend_entries,
+            loc='upper left',
+            frameon=True,
+            fancybox=True,
+            framealpha=0.9,
+            shadow=True,
+            borderpad=0.5
+        )
 
+    # IV scatter overlay with professional styling
     avg_iv = np.nan_to_num((df.get("call_iv", 0) + df.get("put_iv", 0)) / 2)
     iv_axis = ax.twinx()
     scatter = iv_axis.scatter(
         x_positions,
         avg_iv,
         c=avg_iv,
-        cmap="viridis",
-        edgecolors="white",
-        linewidths=0.6,
-        s=60,
-        zorder=3,
+        cmap="plasma",  # Professional alternative to viridis
+        edgecolors='white',
+        linewidths=0.8,
+        s=70,
+        alpha=0.85,
+        zorder=4,
     )
-    iv_axis.set_ylabel("Average IV (%)")
+    iv_axis.set_ylabel("Average IV (%)", fontsize=11, fontweight='500')
     iv_axis.set_ylim(0, max(avg_iv.max() * 1.2, 10))
+    iv_axis.tick_params(axis='y', labelsize=9)
     iv_axis.grid(False)
-    iv_cbar = fig.colorbar(scatter, ax=ax, pad=0.01)
-    iv_cbar.set_label("Avg IV (%)")
+
+    # Hide top and right spines for twinx
+    iv_axis.spines['top'].set_visible(False)
+    iv_axis.spines['right'].set_visible(False)
+
+    iv_cbar = fig.colorbar(scatter, ax=ax, pad=0.015, aspect=30)
+    iv_cbar.set_label("Avg IV (%)", fontsize=10)
+    iv_cbar.ax.tick_params(labelsize=9)
 
     fig.tight_layout()
     return fig
 
 
 def build_iv_smile(df: pd.DataFrame, btc_price: float, expiry: str) -> plt.Figure:
-    """Plot IV smile with calls vs puts and moneyness coloring."""
+    """Plot IV smile with calls vs puts - improved professional styling."""
     strikes = df["strike"].astype(float)
     call_iv = df.get("call_iv", 0).fillna(0)
     put_iv = df.get("put_iv", 0).fillna(0)
     dist_pct = ((strikes - btc_price) / btc_price) * 100
 
+    # Professional color scheme using seaborn's palette
+    call_color = "#3498db"  # Professional blue
+    put_color = "#e74c3c"   # Professional red
+    spot_color = "#7f8c8d"  # Professional gray
+
     norm = Normalize(vmin=-30, vmax=30)
     cmap = "coolwarm"
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(strikes, call_iv, label="Call IV", color="#2c7be5", linewidth=1.8)
-    ax.plot(strikes, put_iv, label="Put IV", color="#ff6b6b", linewidth=1.8)
+    fig, ax = plt.subplots(figsize=(14, 6))
 
+    # Smoother, more professional lines
+    ax.plot(strikes, call_iv, label="Call IV", color=call_color, linewidth=2.2, marker='o', markersize=4, alpha=0.9)
+    ax.plot(strikes, put_iv, label="Put IV", color=put_color, linewidth=2.2, marker='s', markersize=4, alpha=0.9)
+
+    # Professional scatter with better styling
     ax.scatter(
         strikes,
         call_iv,
         c=dist_pct,
         cmap=cmap,
         norm=norm,
-        edgecolor="black",
-        s=40,
+        edgecolor='white',
+        linewidth=0.8,
+        s=50,
+        alpha=0.7,
         zorder=3,
-        label=""
     )
     ax.scatter(
         strikes,
@@ -232,22 +295,49 @@ def build_iv_smile(df: pd.DataFrame, btc_price: float, expiry: str) -> plt.Figur
         c=dist_pct,
         cmap=cmap,
         norm=norm,
-        marker="X",
-        edgecolor="black",
-        s=40,
+        marker='s',
+        edgecolor='white',
+        linewidth=0.8,
+        s=50,
+        alpha=0.7,
         zorder=3,
-        label=""
     )
 
-    ax.axvline(btc_price, linestyle="--", color="grey", label="Spot")
-    ax.set_title(f"IV Smile · BTC {expiry} · Spot ${btc_price:,.0f}")
-    ax.set_xlabel("Strike")
-    ax.set_ylabel("IV (%)")
-    ax.legend(loc="upper right")
+    # Enhanced spot line
+    ax.axvline(btc_price, linestyle='--', color=spot_color, linewidth=1.8, alpha=0.7, label='Spot Price')
 
+    # Improved title and labels
+    title_text = f"IV Smile — BTC {expiry} — Spot ${btc_price:,.0f}"
+    ax.set_title(title_text, pad=15, fontweight='600', loc='left')
+    ax.set_xlabel("Strike Price ($)", fontsize=11, fontweight='500')
+    ax.set_ylabel("Implied Volatility (%)", fontsize=11, fontweight='500')
+
+    # Professional grid
+    ax.grid(True, linestyle='--', alpha=0.2, linewidth=0.8)
+    ax.set_axisbelow(True)
+
+    # Enhanced legend
+    ax.legend(
+        loc='upper right',
+        frameon=True,
+        fancybox=True,
+        framealpha=0.9,
+        shadow=True,
+        borderpad=0.5,
+        ncol=1
+    )
+
+    # Professional colorbar
     sm = ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
-    fig.colorbar(sm, ax=ax, label="Distance from Spot (%)")
+    cbar = fig.colorbar(sm, ax=ax, pad=0.02, aspect=25)
+    cbar.set_label("Distance from Spot (%)", fontsize=10)
+    cbar.ax.tick_params(labelsize=9)
+
+    # Set spine styling
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.8)
+        spine.set_color('#333333')
 
     fig.tight_layout()
     return fig
