@@ -8,6 +8,7 @@ and Rich for terminal summaries.
 
 from __future__ import annotations
 
+import ccxt
 import json
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,15 @@ from rich.table import Table
 
 from btc_options_viewer import deribit_get_index_price, deribit_get_options_chain
 from lotto_scanner import calculate_gex, find_gex_zones
+
+def fetch_live_spot_price() -> float:
+    """Get current BTC spot price using CCXT (Binance exchange)."""
+    try:
+        exchange = ccxt.binance()
+        ticker = exchange.fetch_ticker('BTC/USDT')
+        return ticker['last']
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch live spot price from CCXT: {e}")
 
 
 def _normalize_format_list(raw: List[str], allowed: List[str], option_name: str) -> List[str]:
@@ -49,7 +59,7 @@ app = typer.Typer(help="Pilk options chain visualizer CLI")
 
 
 def fetch_deribit_data(expiry: str) -> tuple[pd.DataFrame, float]:
-    """Fetch Deribit chain data and the current BTC index price."""
+    """Fetch Deribit chain data and the current BTC spot price."""
     console.print(f"[bold]Fetching Deribit BTC chain for expiry [cyan]{expiry}[/cyan]...[/bold]")
     try:
         df = deribit_get_options_chain(expiry, use_parallel=True)
@@ -62,7 +72,7 @@ def fetch_deribit_data(expiry: str) -> tuple[pd.DataFrame, float]:
     df = df.sort_values("strike").reset_index(drop=True)
     df["expiry"] = expiry
 
-    btc_price = deribit_get_index_price()
+    btc_price = fetch_live_spot_price()
     return df, btc_price
 
 
