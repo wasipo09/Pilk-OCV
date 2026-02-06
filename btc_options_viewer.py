@@ -10,12 +10,16 @@ Usage:
 """
 
 import argparse
-import ccxt
-import requests
+import time
 import pandas as pd
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
+from typing import Optional, Callable
+
+from utils import (
+    api_get, fetch_ccxt_ticker, cache_get, cache_set,
+    logger, APIError, DataValidationError
+)
 
 # API Base URLs
 DERIBIT_API = "https://www.deribit.com/api/v2"
@@ -29,10 +33,8 @@ BINANCE_API = "https://eapi.binance.com"
 def fetch_live_spot_price() -> float:
     """Get current BTC spot price using CCXT (Binance exchange)."""
     try:
-        exchange = ccxt.binance()
-        ticker = exchange.fetch_ticker('BTC/USDT')
-        return ticker['last']
-    except Exception as e:
+        return fetch_ccxt_ticker("binance", "BTC/USDT")
+    except APIError as e:
         raise RuntimeError(f"Failed to fetch live spot price from CCXT: {e}")
 
 # CSV column order
@@ -48,14 +50,8 @@ CSV_COLUMNS = [
 
 
 # =============================================================================
-# API HELPERS
+# API HELPERS - Use utils.api_get instead
 # =============================================================================
-
-def api_get(url: str, params: dict = None) -> dict:
-    """Make GET request with error handling"""
-    response = requests.get(url, params=params, timeout=30)
-    response.raise_for_status()
-    return response.json()
 
 
 # =============================================================================

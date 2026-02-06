@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Pilk Options Chain Visualizer - Improved Styling
+"""Pilk Options Chain Visualizer - 3D Enhanced
 
 Provides CLI tooling for building heat maps of Deribit open interest, overlaying GEX zones,
-and plotting IV smiles for BTC options. Enhanced with professional styling.
+and plotting IV smiles for BTC options. Enhanced with 3D visualization effects and modern styling.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ import typer
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.lines import Line2D
+from mpl_toolkits.mplot3d import Axes3D
 from rich.console import Console
 from rich.table import Table
 
@@ -134,15 +135,15 @@ def build_heatmap(
     btc_price: float,
     expiry: str,
 ) -> plt.Figure:
-    """Build the open interest heat map with GEX overlays - improved styling."""
+    """Build the open interest heat map with GEX overlays - enhanced with depth effects."""
     strikes = df["strike"].astype(float).to_numpy()
     call_oi = df.get("call_oi", pd.Series(0, index=df.index)).fillna(0).to_numpy()
     put_oi = df.get("put_oi", pd.Series(0, index=df.index)).fillna(0).to_numpy()
 
     matrix = np.vstack([call_oi, put_oi])
 
-    # Professional color palette - using 'YlOrRd' for warm, professional heatmap
-    fig, ax = plt.subplots(figsize=(15, 7))
+    # Enhanced professional color palette with gradient effects
+    fig, ax = plt.subplots(figsize=(16, 8))
 
     heatmap_kwargs = {"cmap": "YlOrRd", "aspect": "auto", "origin": "lower"}
 
@@ -153,9 +154,17 @@ def build_heatmap(
     else:
         cbar_label = "Open Interest"
 
+    # Add gradient effect with alpha blending
     im = ax.imshow(matrix, **heatmap_kwargs)
-    cbar = fig.colorbar(im, ax=ax, pad=0.015, aspect=30)
-    cbar.set_label(cbar_label, fontsize=10)
+
+    # Add subtle gradient overlay for depth
+    gradient = np.linspace(0, 1, matrix.shape[1])
+    for i in range(matrix.shape[0]):
+        ax.imshow(matrix[i:i+1, :], extent=[-0.5, matrix.shape[1]-0.5, i-0.5, i+0.5],
+                cmap="YlOrRd", alpha=0.95, aspect="auto", norm=heatmap_kwargs.get("norm"))
+
+    cbar = fig.colorbar(im, ax=ax, pad=0.02, aspect=25)
+    cbar.set_label(cbar_label, fontsize=10, fontweight='500')
     cbar.ax.tick_params(labelsize=9)
 
     x_positions = np.arange(len(strikes))
@@ -165,21 +174,21 @@ def build_heatmap(
     ax.set_xticks(tick_indices)
     ax.set_xticklabels([f"{int(strikes[i]):,}" for i in tick_indices], rotation=45, ha='right')
     ax.set_yticks([0, 1])
-    ax.set_yticklabels(["Call OI", "Put OI"], fontsize=11)
+    ax.set_yticklabels(["Call OI", "Put OI"], fontsize=11, fontweight='600')
 
     # Improved title with better formatting
     title_text = f"Open Interest Heatmap — BTC {expiry} — Spot ${btc_price:,.0f}"
-    ax.set_title(title_text, pad=15, fontweight='600', loc='left')
-    ax.set_xlabel("Strike Price", fontsize=11, fontweight='500')
+    ax.set_title(title_text, pad=18, fontweight='600', fontsize=15, loc='left')
+    ax.set_xlabel("Strike Price", fontsize=12, fontweight='500')
     ax.set_xlim(-0.5, len(strikes) - 0.5)
     ax.set_ylim(-0.5, 1.5)
 
     # Professional grid styling
-    ax.grid(False)  # Turn off default grid for heatmap
+    ax.grid(False)
     for spine in ax.spines.values():
         spine.set_visible(True)
-        spine.set_linewidth(0.8)
-        spine.set_color('#333333')
+        spine.set_linewidth(1.0)
+        spine.set_color('#2c3e50')
 
     strike_to_idx = {strike: idx for idx, strike in enumerate(strikes)}
 
@@ -188,67 +197,71 @@ def build_heatmap(
             idx_pos = strike_to_idx.get(row["strike"])
             if idx_pos is None:
                 continue
-            # More subtle, professional dashed lines
-            ax.axvline(idx_pos, color=color, linestyle='--', linewidth=2, alpha=0.7)
+            # Enhanced zone markers with shadow effect
+            ax.axvline(idx_pos, color=color, linestyle='--', linewidth=2.5, alpha=0.8, zorder=5)
+            # Add shadow effect
+            ax.axvline(idx_pos + 0.02, color=color, linestyle='--', linewidth=1, alpha=0.3, zorder=4)
             ax.text(
                 idx_pos,
-                1.42,
+                1.45,
                 f"{label} GEX",
                 rotation=90,
                 color=color,
-                fontsize=9,
-                fontweight='600',
+                fontsize=10,
+                fontweight='700',
                 va='bottom',
                 ha='center',
-                alpha=0.85,
+                alpha=0.9,
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=color, alpha=0.9, linewidth=1.5)
             )
 
-    # Professional color scheme for zones
-    draw_zones(call_zones, "Call", "#2ECC71")  # Emerald green
-    draw_zones(put_zones, "Put", "#E74C3C")  # Professional red
+    # Enhanced color scheme for zones with depth
+    draw_zones(call_zones, "Call", "#2ECC71")
+    draw_zones(put_zones, "Put", "#E74C3C")
 
-    # Enhanced legend
+    # Enhanced legend with better styling
     legend_entries = []
     if not call_zones.empty:
-        legend_entries.append(Line2D([0], [0], color="#2ECC71", linestyle='--', linewidth=2, label="Call GEX Zone"))
+        legend_entries.append(Line2D([0], [0], color="#2ECC71", linestyle='--', linewidth=2.5, label="Call GEX Zone"))
     if not put_zones.empty:
-        legend_entries.append(Line2D([0], [0], color="#E74C3C", linestyle='--', linewidth=2, label="Put GEX Zone"))
+        legend_entries.append(Line2D([0], [0], color="#E74C3C", linestyle='--', linewidth=2.5, label="Put GEX Zone"))
     if legend_entries:
         ax.legend(
             handles=legend_entries,
             loc='upper left',
             frameon=True,
             fancybox=True,
-            framealpha=0.9,
+            framealpha=0.95,
             shadow=True,
-            borderpad=0.5
+            borderpad=0.6,
+            fontsize=10
         )
 
-    # IV scatter overlay with professional styling
+    # IV scatter overlay with enhanced styling
     avg_iv = np.nan_to_num((df.get("call_iv", 0) + df.get("put_iv", 0)) / 2)
     iv_axis = ax.twinx()
     scatter = iv_axis.scatter(
         x_positions,
         avg_iv,
         c=avg_iv,
-        cmap="plasma",  # Professional alternative to viridis
+        cmap="plasma",
         edgecolors='white',
-        linewidths=0.8,
-        s=70,
-        alpha=0.85,
-        zorder=4,
+        linewidths=1.0,
+        s=80,
+        alpha=0.9,
+        zorder=6,
     )
-    iv_axis.set_ylabel("Average IV (%)", fontsize=11, fontweight='500')
+    iv_axis.set_ylabel("Average IV (%)", fontsize=12, fontweight='500')
     iv_axis.set_ylim(0, max(avg_iv.max() * 1.2, 10))
-    iv_axis.tick_params(axis='y', labelsize=9)
+    iv_axis.tick_params(axis='y', labelsize=10)
     iv_axis.grid(False)
 
-    # Hide top and right spines for twinx
+    # Hide spines for cleaner look
     iv_axis.spines['top'].set_visible(False)
     iv_axis.spines['right'].set_visible(False)
 
-    iv_cbar = fig.colorbar(scatter, ax=ax, pad=0.015, aspect=30)
-    iv_cbar.set_label("Avg IV (%)", fontsize=10)
+    iv_cbar = fig.colorbar(scatter, ax=ax, pad=0.02, aspect=25)
+    iv_cbar.set_label("Avg IV (%)", fontsize=10, fontweight='500')
     iv_cbar.ax.tick_params(labelsize=9)
 
     fig.tight_layout()
@@ -343,6 +356,112 @@ def build_iv_smile(df: pd.DataFrame, btc_price: float, expiry: str) -> plt.Figur
     return fig
 
 
+def build_iv_surface_3d(df: pd.DataFrame, btc_price: float, expiry: str) -> plt.Figure:
+    """Build 3D surface plot for IV smile with enhanced depth and lighting."""
+    strikes = df["strike"].astype(float).values
+    call_iv = df.get("call_iv", 0).fillna(0).values
+    put_iv = df.get("put_iv", 0).fillna(0).values
+    avg_iv = (call_iv + put_iv) / 2
+
+    # Create meshgrid for 3D surface
+    X = strikes
+    Y_call = np.full_like(strikes, 1)  # Call surface at y=1
+    Y_put = np.full_like(strikes, 0)   # Put surface at y=0
+
+    # Create finer mesh for smooth surface
+    x_fine = np.linspace(strikes.min(), strikes.max(), 100)
+    y_fine = np.linspace(0, 1, 50)
+    X_fine, Y_fine = np.meshgrid(x_fine, y_fine)
+
+    # Create smooth surface by interpolating between call and put IV
+    Z_fine = np.zeros_like(X_fine)
+    for i in range(X_fine.shape[0]):
+        for j in range(X_fine.shape[1]):
+            y_pos = Y_fine[i, j]
+            if y_pos > 0.5:  # Closer to calls
+                weight = (y_pos - 0.5) * 2
+                z_call = np.interp(X_fine[i, j], strikes, call_iv)
+                z_put = np.interp(X_fine[i, j], strikes, put_iv)
+                Z_fine[i, j] = z_put * (1 - weight) + z_call * weight
+            else:  # Closer to puts
+                weight = (0.5 - y_pos) * 2
+                z_call = np.interp(X_fine[i, j], strikes, call_iv)
+                z_put = np.interp(X_fine[i, j], strikes, put_iv)
+                Z_fine[i, j] = z_call * (1 - weight) + z_put * weight
+
+    # Create 3D figure with enhanced styling
+    fig = plt.figure(figsize=(16, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot surface with gradient colors and enhanced lighting
+    surf = ax.plot_surface(
+        X_fine, Y_fine, Z_fine,
+        cmap='viridis',
+        alpha=0.85,
+        linewidth=0,
+        antialiased=True,
+        rstride=2,
+        cstride=2,
+        shade=True,
+        lightsource=None
+    )
+
+    # Add 3D scatter points for actual data
+    ax.scatter(strikes, Y_put, put_iv, color='#e74c3c', s=60, alpha=0.8,
+               label='Put IV', edgecolors='white', linewidth=1, depthshade=True)
+    ax.scatter(strikes, Y_call, call_iv, color='#3498db', s=60, alpha=0.8,
+               label='Call IV', edgecolors='white', linewidth=1, depthshade=True)
+
+    # Add spot price line in 3D
+    spot_iv = np.interp(btc_price, strikes, avg_iv)
+    ax.plot([btc_price, btc_price], [0, 1], [0, spot_iv * 1.5],
+            color='#7f8c8d', linestyle='--', linewidth=2.5, alpha=0.7, label='Spot Price')
+
+    # Enhanced title and labels
+    title_text = f"3D IV Surface — BTC {expiry} — Spot ${btc_price:,.0f}"
+    ax.set_title(title_text, pad=20, fontweight='600', fontsize=16, loc='left')
+    ax.set_xlabel("Strike Price ($)", fontsize=12, fontweight='500', labelpad=10)
+    ax.set_ylabel("Option Type", fontsize=12, fontweight='500', labelpad=10)
+    ax.set_zlabel("Implied Volatility (%)", fontsize=12, fontweight='500', labelpad=10)
+
+    # Custom Y-axis labels
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(['Put', 'Call'], fontsize=11)
+
+    # Enhanced viewing angle
+    ax.view_init(elev=25, azim=45)
+
+    # Improved axis styling
+    ax.xaxis.label.set_fontweight('500')
+    ax.yaxis.label.set_fontweight('500')
+    ax.zaxis.label.set_fontweight('500')
+
+    # Set grid and pane colors for depth
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
+    ax.grid(True, linestyle='--', alpha=0.3)
+
+    # Professional colorbar
+    cbar = fig.colorbar(surf, ax=ax, shrink=0.5, aspect=20, pad=0.08)
+    cbar.set_label("Implied Volatility (%)", fontsize=11, fontweight='500')
+    cbar.ax.tick_params(labelsize=10)
+
+    # Enhanced legend
+    ax.legend(
+        loc='upper right',
+        frameon=True,
+        fancybox=True,
+        framealpha=0.9,
+        shadow=True,
+        borderpad=0.8,
+        fontsize=10
+    )
+
+    fig.tight_layout()
+    return fig
+
+
 @app.command()
 def visualize(
     symbol: str = typer.Option("BTC", "--symbol", "-s", help="Underlying symbol (BTC only for now)."),
@@ -357,6 +476,11 @@ def visualize(
         "--save-dir",
         "-d",
         help="Optional directory to save PNG previews for the heat map + IV smile (default: none).",
+    ),
+    use_3d: bool = typer.Option(
+        True,
+        "--3d/--no-3d",
+        help="Include 3D IV surface plot in visualizations.",
     ),
 ) -> None:
     symbol = symbol.upper()
@@ -376,6 +500,7 @@ def visualize(
 
     heatmap_fig = build_heatmap(df, call_zones, put_zones, btc_price, expiry)
     iv_fig = build_iv_smile(df, btc_price, expiry)
+    iv_3d_fig = build_iv_surface_3d(df, btc_price, expiry) if use_3d else None
 
     saved_paths: List[Path] = []
     if save_dir:
@@ -384,6 +509,9 @@ def visualize(
         heatmap_path = _save_figure(heatmap_fig, save_dir / f"{symbol}_{expiry}_heatmap.png")
         iv_path = _save_figure(iv_fig, save_dir / f"{symbol}_{expiry}_iv_smile.png")
         saved_paths.extend([heatmap_path, iv_path])
+        if iv_3d_fig:
+            iv_3d_path = _save_figure(iv_3d_fig, save_dir / f"{symbol}_{expiry}_iv_3d.png")
+            saved_paths.append(iv_3d_path)
 
     if show:
         plt.show()
@@ -417,6 +545,11 @@ def export(
         "-o",
         help="Directory where exported files will be written.",
     ),
+    use_3d: bool = typer.Option(
+        True,
+        "--3d/--no-3d",
+        help="Include 3D IV surface plot in exports.",
+    ),
 ) -> None:
     symbol = symbol.upper()
     if symbol != "BTC":
@@ -436,6 +569,7 @@ def export(
 
     heatmap_fig = build_heatmap(df, call_zones, put_zones, btc_price, expiry)
     iv_fig = build_iv_smile(df, btc_price, expiry)
+    iv_3d_fig = build_iv_surface_3d(df, btc_price, expiry) if use_3d else None
 
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -449,6 +583,9 @@ def export(
         iv_path = output_dir / f"{base}_iv_smile.{fmt}"
         saved_images.append(_save_figure(heatmap_fig, heatmap_path))
         saved_images.append(_save_figure(iv_fig, iv_path))
+        if iv_3d_fig:
+            iv_3d_path = output_dir / f"{base}_iv_3d.{fmt}"
+            saved_images.append(_save_figure(iv_3d_fig, iv_3d_path))
 
     raw_paths: List[Path] = []
     raw_df = df.copy()
